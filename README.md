@@ -1,222 +1,157 @@
-# 🎨 AI Media API
+# ComfyUI + AnimateDiff API Server
 
-API tạo ảnh và video bằng AI — miễn phí, dễ dùng, cho bot sử dụng.
-
-## ✨ Tính năng
-
-- 🖼️ **Tạo ảnh AI** — Pollinations.AI (Flux, SDXL) — **không cần API key**
-- 🎬 **AnimateDiff** — Text → animated video
-- 🎥 **Stable Video Diffusion** — Image → video
-- 🌐 **Open-Sora** — Text → video chất lượng cao
-- 🎞️ **UniVideo / VideoCrafter** — Text → video
-- ⚙️ **ComfyUI Proxy** — Kết nối ComfyUI self-hosted
+API server Node.js/Express để tạo ảnh và video AI bằng **ComfyUI** + **AnimateDiff**, không dùng API bên ngoài — chạy hoàn toàn local hoặc tự host.
 
 ---
 
-## 🚀 Deploy lên Render (miễn phí)
+## Tính năng
 
-[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com)
-
-1. Fork repo này
-2. Vào [render.com](https://render.com) → **New Web Service** → kết nối repo
-3. Điền:
-   - **Build Command:** `cd artifacts/api-server && npm install --legacy-peer-deps && node ./build.mjs`
-   - **Start Command:** `node --enable-source-maps artifacts/api-server/dist/index.mjs`
-4. Thêm env var `HF_TOKEN` (lấy miễn phí tại [huggingface.co](https://huggingface.co/settings/tokens))
-5. Bấm **Deploy**
+- Tạo **ảnh** từ text (Stable Diffusion qua ComfyUI)
+- Tạo **video hoạt ảnh** từ text (AnimateDiff qua ComfyUI)
+- Hỗ trợ poll kết quả hoặc chờ đồng bộ (`wait: true`)
+- Xem queue, xóa queue
+- Chạy custom workflow JSON bất kỳ
 
 ---
 
-## 🔑 Environment Variables
+## Yêu cầu
 
-| Biến | Bắt buộc | Mô tả |
+- Node.js 18+
+- [ComfyUI](https://github.com/comfyanonymous/ComfyUI) đang chạy (có GPU)
+- Custom nodes ComfyUI:
+  - [ComfyUI-AnimateDiff-Evolved](https://github.com/Kosinkadink/ComfyUI-AnimateDiff-Evolved)
+  - [ComfyUI-VideoHelperSuite](https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite)
+- Models:
+  - Stable Diffusion checkpoint (ví dụ: `v1-5-pruned-emaonly.safetensors`)
+  - AnimateDiff motion module (ví dụ: `mm_sd_v15_v2.ckpt`)
+
+---
+
+## Cài đặt
+
+```bash
+npm install
+npm run build
+npm start
+```
+
+---
+
+## Biến môi trường
+
+| Biến | Mặc định | Mô tả |
 |------|----------|-------|
-| `PORT` | ✅ | Port server (Render tự set) |
-| `HF_TOKEN` | ✅ cho video | Token Hugging Face miễn phí |
-| `COMFYUI_URL` | ❌ | URL ComfyUI server nếu self-host |
+| `PORT` | `8080` | Port chạy server |
+| `COMFYUI_URL` | `http://127.0.0.1:8188` | URL của ComfyUI server |
 
 ---
 
-## 📡 API Endpoints
+## API Endpoints
 
-### 🖼️ Tạo Ảnh (miễn phí, không cần key)
+### Hệ thống
 
-**`POST /api/image/generate`**
-```json
-{
-  "prompt": "a futuristic city at night, cinematic",
-  "model": "flux",
-  "width": 1024,
-  "height": 1024
-}
-```
-
-**Models:** `flux` · `flux-realism` · `flux-anime` · `flux-3d` · `flux-cablyai` · `turbo`
-
-**Response:**
-```json
-{
-  "url": "https://image.pollinations.ai/...",
-  "b64_json": "...",
-  "content_type": "image/jpeg"
-}
-```
+| Method | Endpoint | Mô tả |
+|--------|----------|-------|
+| GET | `/api/healthz` | Health check |
+| GET | `/api/status` | Kiểm tra kết nối ComfyUI |
+| GET | `/api/models` | Danh sách checkpoints & AnimateDiff models |
+| GET | `/api/queue` | Xem queue |
+| DELETE | `/api/queue` | Xóa queue |
 
 ---
 
-### 🎬 AnimateDiff — Text → Animation
+### Tạo ảnh — `POST /api/txt2img`
 
-**`POST /api/animatediff/generate`**
 ```json
 {
-  "prompt": "a cat running in a field, smooth motion",
-  "model": "animatediff-lightning",
-  "num_frames": 16
-}
-```
-
-**Models:** `animatediff-lightning` · `animatediff-v3` · `hotshot-xl`
-
----
-
-### 🎥 Stable Video Diffusion — Image → Video
-
-**`POST /api/svd/generate`**
-```json
-{
-  "image_url": "https://example.com/photo.jpg",
-  "model": "svd-xt",
-  "num_frames": 25,
-  "fps": 7
-}
-```
-
-**Models:** `svd` · `svd-xt` · `svd-xt-1-1`
-
----
-
-### 🌐 Open-Sora — Text → Video
-
-**`POST /api/opensora/generate`**
-```json
-{
-  "prompt": "a sunset over the ocean, time-lapse",
-  "resolution": "480p",
-  "duration": "4s"
-}
-```
-
----
-
-### 🎞️ UniVideo — Text → Video
-
-**`POST /api/univideo/generate`**
-```json
-{
-  "prompt": "a rocket launching into space",
-  "model": "videocrafter2",
-  "num_frames": 16,
-  "fps": 8
-}
-```
-
-**Models:** `videocrafter2` · `univideo` · `show-1`
-
----
-
-### ⚙️ ZeroScope / ModelScope
-
-**`POST /api/video/generate`**
-```json
-{
-  "prompt": "a dog playing in the park",
-  "model": "zeroscope-v2",
-  "num_frames": 16
-}
-```
-
----
-
-### 🛠️ ComfyUI Proxy (self-hosted)
-
-Set env var `COMFYUI_URL=http://your-server:8188`
-
-| Endpoint | Mô tả |
-|----------|-------|
-| `GET /api/comfyui/status` | Kiểm tra kết nối |
-| `GET /api/comfyui/models` | Danh sách checkpoints |
-| `POST /api/comfyui/txt2img` | Text → Ảnh |
-| `POST /api/comfyui/txt2vid` | Text → Video |
-| `POST /api/comfyui/workflow` | Custom workflow JSON |
-| `GET /api/comfyui/result/:id` | Lấy kết quả |
-
-**`POST /api/comfyui/txt2img`**
-```json
-{
-  "prompt": "a beautiful landscape",
-  "negative_prompt": "blurry, low quality",
-  "checkpoint": "v1-5-pruned-emaonly.ckpt",
+  "prompt": "a beautiful sunset over the ocean",
+  "negative_prompt": "bad quality, blurry",
+  "checkpoint": "v1-5-pruned-emaonly.safetensors",
   "width": 512,
   "height": 512,
-  "steps": 20
+  "steps": 20,
+  "cfg": 7,
+  "sampler": "euler",
+  "seed": 12345,
+  "wait": false
 }
 ```
 
 ---
 
-### ❤️ Health Check
+### Tạo video — `POST /api/animatediff`
 
-**`GET /api/healthz`**
 ```json
-{ "status": "ok" }
+{
+  "prompt": "a girl walking in the park, cinematic",
+  "negative_prompt": "bad quality, blurry, watermark",
+  "checkpoint": "realisticVisionV60B1_v51VAE.safetensors",
+  "animatediff_model": "mm_sd_v15_v2.ckpt",
+  "width": 512,
+  "height": 512,
+  "steps": 20,
+  "cfg": 7,
+  "num_frames": 16,
+  "fps": 8,
+  "format": "video/h264-mp4",
+  "wait": false
+}
 ```
 
 ---
 
-## 🤖 Dùng cho Bot
+### Lấy kết quả — `GET /api/result/:prompt_id`
 
-**Discord Bot / Telegram Bot / n8n / Make.com** — gọi thẳng HTTP request:
-
-```python
-import requests
-
-# Tạo ảnh
-resp = requests.post("https://your-app.onrender.com/api/image/generate", json={
-    "prompt": "a cute anime girl",
-    "model": "flux-anime"
-})
-image_url = resp.json()["url"]
-
-# Tạo video
-resp = requests.post("https://your-app.onrender.com/api/animatediff/generate", json={
-    "prompt": "dancing robot"
-})
-video_b64 = resp.json()["b64_json"]
+```json
+{
+  "status": "completed",
+  "prompt_id": "abc-123",
+  "files": [
+    {
+      "filename": "animatediff_00001.mp4",
+      "url": "http://127.0.0.1:8188/view?filename=...",
+      "type": "output"
+    }
+  ]
+}
 ```
 
-```javascript
-// Node.js / Discord.js
-const res = await fetch("https://your-app.onrender.com/api/image/generate", {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ prompt: "cyberpunk city", model: "flux" })
-});
-const { url } = await res.json();
+> Trạng thái: `pending` → `processing` → `completed`
+
+---
+
+### Custom workflow — `POST /api/workflow`
+
+```json
+{
+  "workflow": { ...ComfyUI workflow JSON... }
+}
 ```
 
 ---
 
-## 📦 Tech Stack
+## Flow hoạt động
 
-- **Runtime:** Node.js + TypeScript
-- **Framework:** Express 5
-- **Image AI:** Pollinations.AI (Flux / SDXL)
-- **Video AI:** Hugging Face Inference API
-- **Build:** esbuild
-- **Deploy:** Render.com
+```
+Client  →  POST /api/animatediff
+        ←  { prompt_id, poll_endpoint }
+
+Client  →  GET /api/result/:prompt_id   (poll mỗi 2-3 giây)
+        ←  { status: "pending" }
+        ←  { status: "processing" }
+        ←  { status: "completed", files: [...] }
+```
+
+Hoặc dùng `"wait": true` để server tự chờ và trả kết quả ngay (timeout 5 phút).
 
 ---
 
-## 📄 License
+## Deploy lên Render + ComfyUI trên Google Colab
 
-MIT — Dùng thoải mái!
+Xem file `comfyui_animatediff_colab.ipynb` để chạy ComfyUI miễn phí trên Colab với GPU T4, sau đó dùng URL ngrok làm `COMFYUI_URL` trên Render.
+
+---
+
+## License
+
+MIT

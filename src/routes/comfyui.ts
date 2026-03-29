@@ -217,7 +217,7 @@ router.post("/animatediff", async (req, res) => {
     const {
       prompt,
       negative_prompt = "bad quality, blurry, distorted, deformed, watermark, text",
-      checkpoint = "realisticVisionV60B1_v51VAE.safetensors",
+      checkpoint = "v1-5-pruned-emaonly.safetensors",
       animatediff_model = "mm_sd_v15_v2.ckpt",
       width = 512,
       height = 512,
@@ -296,8 +296,9 @@ router.post("/animatediff", async (req, res) => {
           loop_count,
           filename_prefix: "animatediff",
           format,
-          images: ["7", 0],
+          pingpong: false,
           save_output: true,
+          images: ["7", 0],
         },
       },
     };
